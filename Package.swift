@@ -27,8 +27,8 @@ let package = Package(
         .target(
             name: "JLR-Swift",
             dependencies: []),
-        .testTarget(
-            name: "JLR-SwiftTests",
-            dependencies: ["JLR-Swift"]),
+//        .testTarget(
+//            name: "JLR-SwiftTests",
+//            dependencies: ["JLR-Swift"]),
     ]
 )
