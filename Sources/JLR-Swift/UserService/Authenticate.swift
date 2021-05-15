@@ -1,15 +1,19 @@
 import Foundation
 import Combine
 
+struct AuthBody: Encodable {
+    private let grantType = "password"
+    var username: String
+    var password: String
+}
+
+
 struct RefreshTokenBody: Encodable {
     private let grantType = "refresh_token"
     var refreshToken: String
 }
 
-public func RefreshToken(token: String, deviceID: String) -> AnyPublisher<Authentication, Error> {
-    
-    let body = RefreshTokenBody(refreshToken: token)
-    
+func makeAuthRequest<T: Encodable>(body: T, deviceId: String) -> AnyPublisher<Authentication, Error> {
     guard let url = URL(string: "\(URLHost.IFAS.rawValue)/tokens") else {
         return Fail(error: APIError.invalidEndpoint)
             .eraseToAnyPublisher()
@@ -21,13 +25,14 @@ public func RefreshToken(token: String, deviceID: String) -> AnyPublisher<Authen
     request.allHTTPHeaderFields = [
         "Content-Type": "application/json",
         "Authorization":"Basic YXM6YXNwYXNz",
-        "X-Device-Id": deviceID,
+        "X-Device-Id": deviceId,
         "Connection": "Close"
     ]
     
     do {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
+        
         request.httpBody = try encoder.encode(body)
     } catch {
         return Fail(error: error)
