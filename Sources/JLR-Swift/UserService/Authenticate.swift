@@ -7,20 +7,17 @@ struct AuthBody: Encodable {
     var password: String
 }
 
-
 struct RefreshTokenBody: Encodable {
     private let grantType = "refresh_token"
     var refreshToken: String
 }
 
-func makeAuthRequest<T: Encodable>(body: T, deviceId: String) -> AnyPublisher<Authentication, Error> {
+func makeAuthRequest<T: Encodable>(body: T, deviceId: String) async throws -> Authentication {
     guard let url = URL(string: "\(URLHost.IFAS.rawValue)/tokens") else {
-        return Fail(error: APIError.invalidEndpoint)
-            .eraseToAnyPublisher()
+        throw APIError.invalidEndpoint
     }
     
     var request = URLRequest(url: url)
-    
     request.httpMethod = "POST"
     request.allHTTPHeaderFields = [
         "Content-Type": "application/json",
@@ -29,18 +26,15 @@ func makeAuthRequest<T: Encodable>(body: T, deviceId: String) -> AnyPublisher<Au
         "Connection": "Close"
     ]
     
-    do {
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        
-        request.httpBody = try encoder.encode(body)
-    } catch {
-        return Fail(error: error)
-            .eraseToAnyPublisher()
-    }
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    
+    request.httpBody = try encoder.encode(body)
+    
+    let (data, _) = try await URLSession.shared.data(for: request)
     
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     
-    return URLSession.shared.publisher(for: request, decoder: decoder)
+    return try decoder.decode(Authentication.self, from: data)
 }
