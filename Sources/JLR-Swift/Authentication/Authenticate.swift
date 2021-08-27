@@ -7,13 +7,11 @@ struct AuthBody: Encodable {
     var password: String
 }
 
-public func Authenticate(username: String, password: String, deviceID: String) -> AnyPublisher<Authentication, Error> {
-    
+public func Authenticate(username: String, password: String, deviceID: String) async throws -> Authentication {
     let body = AuthBody(username: username, password: password)
     
     guard let url = URL(string: "\(URLHost.IFAS.rawValue)/tokens") else {
-        return Fail(error: APIError.invalidEndpoint)
-            .eraseToAnyPublisher()
+        throw APIError.invalidEndpoint
     }
     
     var request = URLRequest(url: url)
@@ -25,18 +23,14 @@ public func Authenticate(username: String, password: String, deviceID: String) -
         "X-Device-Id": deviceID,
         "Connection": "Close"
     ]
+
+    let encoder = JSONEncoder()
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    request.httpBody = try encoder.encode(body)
     
-    do {
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        request.httpBody = try encoder.encode(body)
-    } catch {
-        return Fail(error: error)
-            .eraseToAnyPublisher()
-    }
+    let (data, _) = try await URLSession.shared.data(from: url)
     
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
-    
-    return URLSession.shared.publisher(for: request, decoder: decoder)
+    return try decoder.decode(Authentication.self, from: data)
 }
