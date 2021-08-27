@@ -2,32 +2,26 @@ import Foundation
 import Combine
 
 protocol JLRUserService {
-    func authenticate(refreshToken: String, deviceID: String) -> AnyPublisher<Authentication, Error>
-    
-    func authenticate(username: String, password: String, deviceID: String) -> AnyPublisher<Authentication, Error>
-    
-    func fetchUser(accessToken: String, loginName: String, deviceID: String) -> AnyPublisher<User, Error>
-    
-    func registerDevice(accessToken: String, username: String, authorizationToken: String, expiresIn: Int, deviceID: String) -> AnyPublisher<Void, Error>
+    func authenticate(username: String, password: String, deviceID: String) async throws -> Authentication
+    func authenticate(refreshToken: String, deviceID: String) async throws -> Authentication
+    func fetchUser(accessToken: String, loginName: String, deviceID: String) async throws -> User
+    func registerDevice(accessToken: String, username: String, authorizationToken: String, expiresIn: Int, deviceID: String) async throws -> Void
 }
 
 public struct UserService: JLRUserService {
-    
-    
-    func authenticate(refreshToken: String, deviceID: String) -> AnyPublisher<Authentication, Error> {
+    func authenticate(refreshToken: String, deviceID: String) async throws -> Authentication {
         let body = RefreshTokenBody(refreshToken: refreshToken)
-        return makeAuthRequest(body: body, deviceId: deviceID)
+        return try await makeAuthRequest(body: body, deviceId: deviceID)
     }
     
-    func authenticate(username: String, password: String, deviceID: String) -> AnyPublisher<Authentication, Error> {
+    func authenticate(username: String, password: String, deviceID: String) async throws -> Authentication {
         let body = AuthBody(username: username, password: password)
-        return makeAuthRequest(body: body, deviceId: deviceID)
+        return try await makeAuthRequest(body: body, deviceId: deviceID)
     }
     
-    func fetchUser(accessToken: String, loginName: String, deviceID: String) -> AnyPublisher<User, Error> {
+    func fetchUser(accessToken: String, loginName: String, deviceID: String) async throws -> User {
         guard let url = URL(string: "\(URLHost.IF9)/users?loginName=\(loginName)}") else {
-            return Fail(error: APIError.invalidEndpoint)
-                .eraseToAnyPublisher()
+            throw APIError.invalidEndpoint
         }
         
         var request = URLRequest(url: url)
@@ -39,38 +33,36 @@ public struct UserService: JLRUserService {
             "X-Device-Id": deviceID,
         ]
         
-        return URLSession.shared.publisher(for: request)
+        let (data, _) = try await URLSession.shared.data(for: request)
+        
+        return try JSONDecoder().decode(User.self, from: data)
     }
     
-    func registerDevice(accessToken: String, username: String, authorizationToken: String, expiresIn: Int, deviceID: String) -> AnyPublisher<Void, Error> {
+    func registerDevice(accessToken: String, username: String, authorizationToken: String, expiresIn: Int, deviceID: String) async throws {
         guard let url = URL(string: "\(URLHost.IFOP)/users/\(username)/clients ") else {
-            return Fail(error: APIError.invalidEndpoint)
-                .eraseToAnyPublisher()
+            throw APIError.invalidEndpoint
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.allHTTPHeaderFields = [
             "Content-Type": "application/json",
-            "Authorization":"Bearer \(accessToken)",
+//            "Authorization":"Bearer \(accessToken)",
             "X-Device-Id": deviceID,
             "Connection": "close",
         ]
         
-        let body = [
-            "access_token": accessToken,
-            "authorization_token": authorizationToken,
-            "expires_in": expiresIn,
-            "deviceID": deviceID,
-        ] as [String : Any]
+        let body = registerDeviceBody(access_token: accessToken, authorization_token: authorizationToken, expires_in: expiresIn, deviceId: deviceID)
         
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        } catch {
-            return Fail(error: error)
-                .eraseToAnyPublisher()
-        }
+        request.httpBody = try JSONEncoder().encode(body)
         
-        return URLSession.shared.publisher(for: request)
+        _ = try await URLSession.shared.data(for: request)
     }
+}
+
+struct registerDeviceBody {
+    var access_token: String
+    var authorization_token: String
+    var expires_in: Int
+    var deviceId: String
 }
