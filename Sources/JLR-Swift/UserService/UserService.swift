@@ -47,7 +47,7 @@ public struct UserService: JLRUserService {
         request.httpMethod = "POST"
         request.allHTTPHeaderFields = [
             "Content-Type": "application/json",
-//            "Authorization":"Bearer \(accessToken)",
+            "Authorization":"Bearer \(accessToken)",
             "X-Device-Id": deviceID,
             "Connection": "close",
         ]
@@ -60,7 +60,7 @@ public struct UserService: JLRUserService {
     }
 }
 
-struct registerDeviceBody {
+struct registerDeviceBody: Encodable {
     var access_token: String
     var authorization_token: String
     var expires_in: Int
